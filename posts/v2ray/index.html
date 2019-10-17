@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+	<title>ubuntu下v2ray&#43;nginx&#43;cdn简单配置及youtube视频下载方法</title>
+	
+	<meta name="description" content="">
+	<meta name="image" content="">
+	
+	<meta itemprop="name" content="ubuntu下v2ray&#43;nginx&#43;cdn简单配置及youtube视频下载方法">
+	<meta itemprop="description" content="">
+	<meta itemprop="image" content="">
+	
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="ubuntu下v2ray&#43;nginx&#43;cdn简单配置及youtube视频下载方法">
+	<meta name="twitter:description" content="">
+	<meta name="twitter:site" content="@">
+	<meta name="twitter:creator" content="@">
+	<meta name="twitter:image:src" content="">
+	
+	
+	<meta name="og:title" content="ubuntu下v2ray&#43;nginx&#43;cdn简单配置及youtube视频下载方法">
+	<meta name="og:description" content="">
+	
+	<meta name="og:url" content="http://fymen.github.io/posts/v2ray/">
+	<meta name="og:site_name" content="ubuntu下v2ray&#43;nginx&#43;cdn简单配置及youtube视频下载方法">
+	<meta name="og:type" content="article">
+	
+	<meta name="article:author" content="">
+	<meta name="article:tag" content="">
+	<link rel="stylesheet" type="text/css" href="/css/style.css">
+	<script src="/js/caption.js"></script>
+</head>
+<body>
+
+<header >
+	<a href="/" style="float: left;color:#777;"><strong>Caterpillar in the tree</strong>
+	</a>
+
+	&nbsp;&nbsp;·&nbsp;&nbsp;
+
+
+
+
+
+<a href="http://fymen.github.io/about/" style="color:#777;"><strong>About Me</strong></a>
+
+</header>
+
+
+<div id="loadingMask" style="width: 100%; height: 100%; position: fixed; background: #fff;"></div>
+<script>
+function fadeOut(el) {
+  el.style.opacity = 1;
+
+  var last = +new Date();
+  var tick = function() {
+    el.style.opacity = +el.style.opacity - (new Date() - last) / 80;
+    last = +new Date();
+    
+
+    if (el.style.opacity > 0) {
+      (window.requestAnimationFrame && requestAnimationFrame(tick)) || setTimeout(tick, 16);
+    } else {
+    	el.style.display='none';
+    }
+  };
+
+  tick();
+}
+
+function ready(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+         el = document.getElementById('loadingMask');
+         fadeOut(el);
+        var elements = document.querySelectorAll("img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("alt")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("alt"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+
+    } else {
+        document.addEventListener('DOMContentLoaded', fn);
+    }
+}
+window.onload = ready;
+</script>
+
+<div class="content">
+	<h1>ubuntu下v2ray&#43;nginx&#43;cdn简单配置及youtube视频下载方法 <aside></aside></h1>
+	
+
+<p><style>
+  .ox-hugo-toc ul {
+    list-style: none;
+  }
+</style>
+<div class="ox-hugo-toc toc">
+<div></div></p>
+
+<div class="heading">Table of Contents</div>
+
+<ul>
+<li><span class="section-num">1</span> <a href="#简介">简介</a></li>
+<li><span class="section-num">2</span> <a href="#v2ray安装方法">v2ray安装方法</a></li>
+<li><span class="section-num">3</span> <a href="#域名和cdn配置">域名和CDN配置</a></li>
+<li><span class="section-num">4</span> <a href="#nginx配置">nginx配置</a></li>
+<li><span class="section-num">5</span> <a href="#服务端配置">服务端配置</a></li>
+<li><span class="section-num">6</span> <a href="#客服端配置">客服端配置</a></li>
+<li><span class="section-num">7</span> <a href="#通过docker配置">通过docker配置</a></li>
+<li><span class="section-num">8</span> <a href="#浏览器配置">浏览器配置</a></li>
+<li><span class="section-num">9</span> <a href="#youtube视频下载">youtube视频下载</a></li>
+</ul>
+
+<p></div>
+<!--endtoc--></p>
+
+<h2 id="简介"><span class="section-num">1</span> 简介</h2>
+
+<p>v2ray 主要用以数据的加密传输，项目主页：<a href="https://github.com/v2ray/v2ray-core">https://github.com/v2ray/v2ray-core</a></p>
+
+<p>nginx的配置原理是：直接通过 http/https 访问 vps 的数据会被nginx解释，并返回nginx提供的内容；但访问某特定路径的的数据会被转发给v2ray所监听的端口。使得监控方难以简单的判定该流量是否非法。</p>
+
+<p>CDN 则负责将你对域名的访问解析为其ip库中的ip, 并通过该ip将数据转发给你的真实ip。其本意是对数据访问进行加速，但在这里直到隐藏真实ip的目的。</p>
+
+<h2 id="v2ray安装方法"><span class="section-num">2</span> v2ray安装方法</h2>
+
+<pre><code class="language-sh">wget https://install.direct/go.sh
+sudo bash go.sh
+</code></pre>
+
+<p>Add <em>/usr/bin/v2ray</em> to <code>$PATH</code></p>
+
+<h2 id="域名和cdn配置"><span class="section-num">3</span> 域名和CDN配置</h2>
+
+<p>注册 <a href="https://www.cloudflare.com/">cloudflare </a>账号，配置使用其CDN功能。</p>
+
+<p>购买或申请免费域名，在域名管理中将 DNS 设置为 cloudflare 提供的域名服务器。</p>
+
+<h2 id="nginx配置"><span class="section-num">4</span> nginx配置</h2>
+
+<p>编辑配置文件 <code>/etc/nginx/sites-available/default</code></p>
+
+<pre><code class="language-bash">server {
+	listen 80 default_server;
+	listen [::]:80 default_server;
+
+	# SSL configuration
+	#
+	listen 443 ssl default_server;
+	listen [::]:443 ssl default_server;
+
+	location /your_path { # 路径为上面的路径
+		proxy_redirect off;
+		proxy_pass http://127.0.0.1:your_port; # 端口要变成v2ray运行的端口
+		proxy_http_version 1.1;
+		proxy_set_header Upgrade $http_upgrade;
+		proxy_set_header Connection &quot;upgrade&quot;;
+		proxy_set_header Host $http_host;
+	}
+
+	root /var/www/html;
+
+	# Add index.php to the list if you are using PHP
+	index index.html index.htm index.nginx-debian.html;
+
+	server_name www.soulbound.site;
+
+	location / {
+		# First attempt to serve request as file, then
+		# as directory, then fall back to displaying a 404.
+		try_files $uri $uri/ =404;
+	}
+}
+</code></pre>
+
+<h2 id="服务端配置"><span class="section-num">5</span> 服务端配置</h2>
+
+<pre><code class="language-json">{
+    &quot;log&quot;: {
+	&quot;access&quot;: &quot;/var/log/v2ray/access.log&quot;,
+	&quot;error&quot;: &quot;/var/log/v2ray/error.log&quot;,
+	&quot;loglevel&quot;: &quot;warning&quot;
+    },
+    &quot;inbounds&quot;: [
+	{
+	    &quot;port&quot;: your_port,
+	    &quot;protocol&quot;: &quot;vmess&quot;,
+	    &quot;settings&quot;: {
+		&quot;clients&quot;: [
+		    {
+			&quot;id&quot;: &quot;your_uuid&quot;,
+			&quot;level&quot;: 1,
+			&quot;alterId&quot;: 233
+		    }
+		]
+	    },
+	    &quot;streamSettings&quot;: {
+		&quot;wsSettings&quot;:{
+		    &quot;path&quot;:&quot;/your_path&quot;,
+		    &quot;headers&quot;:{}
+		},
+		&quot;network&quot;:&quot;ws&quot;
+	    },
+	    &quot;sniffing&quot;: {
+		&quot;enabled&quot;: true,
+		&quot;destOverride&quot;: [
+		    &quot;http&quot;,
+		    &quot;tls&quot;
+		]
+	    }
+	}
+
+    ],
+    &quot;outbounds&quot;: [
+	{
+	    &quot;protocol&quot;: &quot;freedom&quot;,
+	    &quot;settings&quot;: {}
+	},
+	{
+	    &quot;protocol&quot;: &quot;blackhole&quot;,
+	    &quot;settings&quot;: {},
+	    &quot;tag&quot;: &quot;blocked&quot;
+	},
+	{
+	    &quot;protocol&quot;: &quot;freedom&quot;,
+	    &quot;settings&quot;: {},
+	    &quot;tag&quot;: &quot;direct&quot;
+	},
+	{
+	    &quot;protocol&quot;: &quot;mtproto&quot;,
+	    &quot;settings&quot;: {},
+	    &quot;tag&quot;: &quot;tg-out&quot;
+	}
+
+    ],
+    &quot;dns&quot;: {
+	&quot;server&quot;: [
+	    &quot;1.1.1.1&quot;,
+	    &quot;1.0.0.1&quot;,
+	    &quot;8.8.8.8&quot;,
+	    &quot;8.8.4.4&quot;,
+	    &quot;localhost&quot;
+	]
+    },
+    &quot;routing&quot;: {
+	&quot;domainStrategy&quot;: &quot;IPOnDemand&quot;,
+	&quot;rules&quot;: [
+	    {
+		&quot;type&quot;: &quot;field&quot;,
+		&quot;ip&quot;: [
+		    &quot;0.0.0.0/8&quot;,
+		    &quot;::1/128&quot;,
+		    &quot;fc00::/7&quot;,
+		    &quot;fe80::/10&quot;
+		],
+		&quot;outboundTag&quot;: &quot;blocked&quot;
+	    },
+	    {
+		&quot;type&quot;: &quot;field&quot;,
+		&quot;inboundTag&quot;: [&quot;tg-in&quot;],
+		&quot;outboundTag&quot;: &quot;tg-out&quot;
+	    }
+	    ,
+	    {
+		&quot;type&quot;: &quot;field&quot;,
+		&quot;domain&quot;: [
+		    &quot;domain:shenyun.com&quot;
+		],
+		&quot;outboundTag&quot;: &quot;blocked&quot;
+	    }                       ,
+	    {
+		&quot;type&quot;: &quot;field&quot;,
+		&quot;protocol&quot;: [
+		    &quot;bittorrent&quot;
+		],
+		&quot;outboundTag&quot;: &quot;blocked&quot;
+	    }
+	]
+    },
+    &quot;transport&quot;: {
+	&quot;kcpSettings&quot;: {
+	    &quot;uplinkCapacity&quot;: 100,
+	    &quot;downlinkCapacity&quot;: 100,
+	    &quot;congestion&quot;: true
+	},
+	&quot;sockopt&quot;: {
+	    &quot;tcpFastOpen&quot;: true
+	}
+    }
+}
+</code></pre>
+
+<p>Create firewall rules to enable Igress and Egress of the port by the following command or you should do it on your vps control panel.</p>
+
+<pre><code class="language-sh">iptables -A INPUT -p udp -m state --state NEW -m udp --dport 16028 -j ACCEPT
+iptables -A INPUT -p tcp -m state --state NEW -m tcp --dport 16028 -j ACCEPT
+</code></pre>
+
+<h2 id="客服端配置"><span class="section-num">6</span> 客服端配置</h2>
+
+<pre><code class="language-json">{
+    &quot;inbounds&quot;: [{
+	&quot;port&quot;: 1080,  // SOCKS 代理端口，在浏览器中需配置代理并指向这个端口
+	&quot;listen&quot;: &quot;127.0.0.1&quot;,
+	&quot;protocol&quot;: &quot;socks&quot;,
+	&quot;domainOverride&quot;: [&quot;tls&quot;,&quot;http&quot;],
+	&quot;settings&quot;: {
+	    &quot;auth&quot;: &quot;noauth&quot;
+	}
+    }],
+    &quot;outbounds&quot;: [{
+	&quot;protocol&quot;: &quot;vmess&quot;,
+	&quot;settings&quot;: {
+	    &quot;vnext&quot;: [{
+		&quot;address&quot;: &quot;your_site&quot;, // 服务器地址，请修改为你自己的服务器 ip 或域名
+		&quot;port&quot;: 443,  // 服务器端口
+		&quot;users&quot;: [{
+		    &quot;id&quot;: &quot;your_uuid&quot;,
+		    &quot;alterId&quot;: 233
+		}]
+	    }]
+	}
+    },{
+	&quot;protocol&quot;: &quot;freedom&quot;,
+	&quot;tag&quot;: &quot;direct&quot;,
+	&quot;settings&quot;: {}
+    }],
+    &quot;routing&quot;: {
+	&quot;domainStrategy&quot;:&quot;IPOnDemand&quot;,
+	&quot;rules&quot;: [
+	    {
+		&quot;type&quot;: &quot;field&quot;,
+		&quot;outboundTag&quot;: &quot;direct&quot;,
+		&quot;domain&quot;: [
+		    &quot;geosite:cn&quot;
+		]
+
+	    },
+	    {
+		&quot;type&quot;: &quot;field&quot;,
+		&quot;outboundTag&quot;: &quot;direct&quot;,
+		&quot;ip&quot;: [
+		    &quot;0.0.0.0\/8&quot;,
+		    &quot;10.0.0.0\/8&quot;,
+		    &quot;100.64.0.0\/10&quot;,
+		    &quot;127.0.0.0\/8&quot;,
+		    &quot;169.254.0.0\/16&quot;,
+		    &quot;172.16.0.0\/12&quot;,
+		    &quot;192.0.0.0\/24&quot;,
+		    &quot;192.0.2.0\/24&quot;,
+		    &quot;192.168.0.0\/16&quot;,
+		    &quot;198.18.0.0\/15&quot;,
+		    &quot;198.51.100.0\/24&quot;,
+		    &quot;203.0.113.0\/24&quot;,
+		    &quot;::1\/128&quot;,
+		    &quot;fc00::\/7&quot;,
+		    &quot;fe80::\/10&quot;,
+		    &quot;geoip:cn&quot;,
+		    &quot;geoip:private&quot;
+		]
+	    }
+	]
+    }
+}
+
+
+</code></pre>
+
+<pre><code class="language-sh">sudo service v2ray restart
+</code></pre>
+
+<h2 id="通过docker配置"><span class="section-num">7</span> 通过docker配置</h2>
+
+<pre><code class="language-bash">sudo apt install docker.io
+sudo usermod -aG docker ${USER}
+
+docker pull v2ray/official
+docker run -d --name v2ray -v /etc/v2ray:/etc/v2ray -p 443:443 v2ray/official  v2ray -config=/etc/v2ray/config.json
+</code></pre>
+
+<h2 id="浏览器配置"><span class="section-num">8</span> 浏览器配置</h2>
+
+<p>设置且仅设置socks5代理，指向127.0.0.1:1080。</p>
+
+<h2 id="youtube视频下载"><span class="section-num">9</span> youtube视频下载</h2>
+
+<p>安装youtube-dl:</p>
+
+<p><a href="https://ytdl-org.github.io/youtube-dl/">https://ytdl-org.github.io/youtube-dl/</a></p>
+
+<p>执行以下命令下载视频:</p>
+
+<pre><code class="language-bash">youtube-dl --proxy socks5://127.0.0.1:1080/ -F https://www.youtube.com/watch?v=ll_OioxmtRs&amp;t=932s
+youtube-dl --proxy socks5://127.0.0.1:1080/ -f 136 https://www.youtube.com/watch?v=ll_OioxmtRs&amp;t=932s
+youtube-dl -v --embed-subs --write-auto-sub --proxy socks5://127.0.0.1:1080/ -f 136 https://www.youtube.com/watch?v=ll_OioxmtRs&amp;t=932s # With subtitle
+</code></pre>
+
+</div>
+
+
+
+
+
+
+
+
+
+<footer>
+	
+	
+</footer>
+</body>
+</html>
+
